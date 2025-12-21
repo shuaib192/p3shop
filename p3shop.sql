@@ -91,7 +91,9 @@ CREATE TABLE `sales` (
   `total_price` decimal(10,2) NOT NULL,
   `sale_date` date NOT NULL,
   `payment_method` varchar(50) NOT NULL DEFAULT 'Cash',
-  `cost_price` decimal(10,2) DEFAULT 0.00
+  `cost_price` decimal(10,2) DEFAULT 0.00,
+  `status` enum('recorded','voided','returned') NOT NULL DEFAULT 'recorded',
+  `void_reason` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

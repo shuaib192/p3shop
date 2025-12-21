@@ -65,7 +65,7 @@ if ($result_products) {
 }
 
 $todays_sales = array();
-$sales_sql = "SELECT p.name, s.quantity_sold, s.total_price, s.payment_method 
+$sales_sql = "SELECT s.id, p.name, s.quantity_sold, s.total_price, s.payment_method, s.status, s.void_reason 
               FROM sales s 
               JOIN products p ON s.product_id = p.id 
               WHERE s.user_id = " . $staff_id . " AND s.sale_date = '" . $today_date . "' 
@@ -155,19 +155,35 @@ if ($sales_result) { while ($row = $sales_result->fetch_assoc()) { $todays_sales
             </form>
         </div>
 
-        <div class="card" style="margin-top: 2rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+        <div class="card" style="margin-top: 2rem; max-width: 800px; margin-left: auto; margin-right: auto;">
             <div class="card-header"><h3>Recent Sales Today</h3></div>
             <div class="table-wrapper">
                 <table class="content-table">
-                    <thead><tr><th>Product</th><th>Qty</th><th>Total</th></tr></thead>
+                    <thead><tr><th>Product</th><th>Qty</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody>
                         <?php if (empty($todays_sales)): ?>
-                            <tr><td colspan="3" style="text-align: center;">No sales yet</td></tr>
-                        <?php else: foreach (array_slice($todays_sales, 0, 5) as $sale): ?>
+                            <tr><td colspan="5" style="text-align: center;">No sales yet</td></tr>
+                        <?php else: foreach (array_slice($todays_sales, 0, 10) as $sale): ?>
                             <tr>
                                 <td data-label="Product"><?php echo htmlspecialchars($sale['name']); ?></td>
                                 <td data-label="Qty"><?php echo $sale['quantity_sold']; ?></td>
                                 <td data-label="Total">₦<?php echo number_format($sale['total_price'], 0); ?></td>
+                                <td data-label="Status">
+                                    <span class="badge <?php echo $sale['status'] == 'recorded' ? 'badge-success' : 'badge-warning'; ?>">
+                                        <?php echo ucfirst($sale['status']); ?>
+                                    </span>
+                                </td>
+                                <td data-label="Action">
+                                    <?php if ($sale['status'] == 'recorded'): ?>
+                                        <button onclick="reverseSale(<?php echo $sale['id']; ?>)" class="btn btn-warning" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">
+                                            <i class="ri-arrow-go-back-line"></i> Mistake / Return
+                                        </button>
+                                    <?php else: ?>
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">
+                                            <?php echo htmlspecialchars($sale['void_reason']); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
@@ -176,7 +192,27 @@ if ($sales_result) { while ($row = $sales_result->fetch_assoc()) { $todays_sales
         </div>
     </div>
 
+    <!-- Hidden Reversal Form -->
+    <form id="reversal-form" action="void_sale.php" method="POST" style="display: none;">
+        <input type="hidden" name="sale_id" id="reversal-id">
+        <input type="hidden" name="reason" id="reversal-reason">
+        <input type="hidden" name="action" id="reversal-action">
+    </form>
+
     <script>
+        function reverseSale(id) {
+            const action = confirm("Was this a Mistake (Void) or a Return?\n\nOK for Mistake/Void, Cancel for Return.") ? 'voided' : 'returned';
+            const reason = prompt("Enter REASON for " + action.toUpperCase() + " (Mandatory):");
+            
+            if (reason && reason.trim().length > 3) {
+                document.getElementById('reversal-id').value = id;
+                document.getElementById('reversal-reason').value = reason;
+                document.getElementById('reversal-action').value = action;
+                document.getElementById('reversal-form').submit();
+            } else if (reason !== null) {
+                alert("Valid reason is required to process reversals.");
+            }
+        }
         const categorySelect = document.getElementById('category-select');
         const productSelect = document.getElementById('product-select');
         const productIdInput = document.getElementById('product_id');

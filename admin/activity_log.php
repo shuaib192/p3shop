@@ -17,7 +17,8 @@ $sql = "(SELECT
             p.price as unit_price,
             (sl.quantity_change * (p.cost_price / p.units_per_pack)) as financial_impact,
             'Admin Panel' as source,
-            sl.reason as details
+            sl.reason as details,
+            'N/A' as status
          FROM stock_log sl 
          JOIN users u ON sl.user_id = u.id 
          JOIN products p ON sl.product_id = p.id
@@ -35,7 +36,8 @@ $sql = "(SELECT
             s.total_price / s.quantity_sold as unit_price,
             s.total_price as financial_impact,
             'Staff Terminal' as source,
-            s.payment_method as details
+            CONCAT(s.payment_method, IF(s.status != 'recorded', CONCAT(' (', s.status, ': ', s.void_reason, ')'), '')) as details,
+            s.status
          FROM sales s 
          JOIN users u ON s.user_id = u.id 
          JOIN products p ON s.product_id = p.id
@@ -60,9 +62,14 @@ if ($result) {
 <?php include 'includes/navbar.php'; ?>
     <div class="container" style="max-width: 1600px;">
         <div class="card">
-            <div class="card-header">
-                <h2><i class="ri-shield-check-line"></i> Master Audit Log (13-Point Detail)</h2>
-                <span style="color: var(--text-muted); font-size: 0.9rem;">Showing last 200 actions</span>
+            <div class="card-header" style="justify-content: space-between; display: flex; align-items: center;">
+                <div>
+                    <h2><i class="ri-shield-check-line"></i> Master Audit Log (13-Point Detail)</h2>
+                    <span style="color: var(--text-muted); font-size: 0.9rem;">Showing last 200 actions</span>
+                </div>
+                <a href="export_logs.php" class="btn btn-primary">
+                    <i class="ri-download-cloud-2-line"></i> Download Activity Log (CSV)
+                </a>
             </div>
             <div class="table-wrapper">
                 <table class="content-table" style="font-size: 0.85rem;">
