@@ -1,259 +1,353 @@
 <?php
 require_once '../includes/db.php';
-
-// Security check
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') {
-    header('Location: ../login.php');
-    exit;
-}
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') { header('Location: ../login.php'); exit; }
 
 $message = '';
 $staff_id = (int)$_SESSION['user_id'];
 $today_date = date('Y-m-d');
+$username = $_SESSION['username'];
 
-// === HANDLE SALE (ULTRA-COMPATIBLE, SAFE VERSION) ===
+// Handle sale
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['process_sale'])) {
-    $product_id = isset($_POST['product_id']) ? (int)$_POST['product_id'] : 0;
-    $quantity_sold = isset($_POST['quantity_sold']) ? (int)$_POST['quantity_sold'] : 0;
-    $payment_method = isset($_POST['payment_method']) ? $_POST['payment_method'] : '';
+    $cart = json_decode($_POST['cart_data'] ?? '[]', true);
+    $payment = mysqli_real_escape_string($conn, $_POST['payment_method'] ?? 'Cash');
 
-    if ($product_id > 0 && $quantity_sold > 0 && !empty($payment_method)) {
-        // Get product details
-        $product_sql = "SELECT * FROM products WHERE id = " . $product_id;
-        $product_result = $conn->query($product_sql);
-        $product = $product_result->fetch_assoc();
+    if (!empty($cart) && !empty($payment)) {
+        $all_ok = true;
+        $receipt_items = [];
 
-        if ($product && (int)$product['quantity_in_stock'] >= $quantity_sold) {
-            $new_stock = (int)$product['quantity_in_stock'] - $quantity_sold;
-            $total_price = (float)$product['price'] * $quantity_sold;
-            $unit_cost = (float)$product['cost_price'] / (int)$product['units_per_pack'];
-            $cost_price = $unit_cost * $quantity_sold;
-            $safe_payment_method = mysqli_real_escape_string($conn, $payment_method);
+        foreach ($cart as $item) {
+            $pid = (int)$item['id'];
+            $qty = (int)$item['qty'];
+            if ($pid <= 0 || $qty <= 0) continue;
 
-            // Update product stock
-            $conn->query("UPDATE products SET quantity_in_stock = " . $new_stock . " WHERE id = " . $product_id);
+            $p = $conn->query("SELECT * FROM products WHERE id=$pid")->fetch_assoc();
+            if (!$p || (int)$p['quantity_in_stock'] < $qty) { $all_ok = false; break; }
 
-            // Insert sale record
-            $insert_sql = "INSERT INTO sales (product_id, user_id, quantity_sold, total_price, cost_price, sale_date, payment_method) 
-                           VALUES (" . $product_id . ", " . $staff_id . ", " . $quantity_sold . ", " . $total_price . ", " . $cost_price . ", '" . $today_date . "', '" . $safe_payment_method . "')";
-            
-            if ($conn->query($insert_sql)) {
-                $message = "<div class='alert alert-success'>Sale recorded successfully!</div>";
-            } else {
-                $message = "<div class='alert alert-danger'>Error: Could not save the sale.</div>";
-            }
-        } else {
-            $message = "<div class='alert alert-danger'>Sale failed. Not enough stock available.</div>";
+            $new_stock = (int)$p['quantity_in_stock'] - $qty;
+            $total = (float)$p['price'] * $qty;
+            $unit_cost = (float)$p['cost_price'] / (int)$p['units_per_pack'];
+            $cost = $unit_cost * $qty;
+            $safe_pay = mysqli_real_escape_string($conn, $payment);
+
+            $conn->query("UPDATE products SET quantity_in_stock=$new_stock WHERE id=$pid");
+            $conn->query("INSERT INTO sales (product_id, user_id, quantity_sold, total_price, cost_price, sale_date, payment_method) VALUES ($pid, $staff_id, $qty, $total, $cost, '$today_date', '$safe_pay')");
+
+            $receipt_items[] = ['name' => $p['name'], 'qty' => $qty, 'price' => $p['price'], 'total' => $total];
         }
-    } else {
-        $message = "<div class='alert alert-danger'>Please select a product, quantity, and payment method.</div>";
+
+        if ($all_ok && !empty($receipt_items)) {
+            $receipt_total = array_sum(array_column($receipt_items, 'total'));
+            $message = 'success';
+        } else {
+            $message = 'error';
+        }
     }
 }
 
-// === FETCH DATA (ULTRA-COMPATIBLE VERSION) ===
-$products_in_stock = array();
-$result_products = $conn->query("SELECT p.id, p.name, p.quantity_in_stock, p.price, c.name as category_name 
-                                FROM products p 
-                                LEFT JOIN categories c ON p.category_id = c.id 
-                                WHERE p.quantity_in_stock > 0 
-                                ORDER BY c.name ASC, p.name ASC");
-if ($result_products) { 
-    while ($row = $result_products->fetch_assoc()) { 
-        $cat = $row['category_name'] ? $row['category_name'] : 'Others';
-        $products_in_stock[$cat][] = $row; 
-    } 
+// Fetch products
+$products_in_stock = [];
+$res = $conn->query("SELECT p.id, p.name, p.quantity_in_stock, p.price, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id=c.id ORDER BY c.name ASC, p.name ASC");
+while ($r = $res->fetch_assoc()) {
+    $cat = $r['category_name'] ?: 'Others';
+    $products_in_stock[$cat][] = $r;
 }
 
-$todays_sales = array();
-$sales_sql = "SELECT s.id, p.name, s.quantity_sold, s.total_price, s.payment_method, s.status, s.void_reason 
-              FROM sales s 
-              JOIN products p ON s.product_id = p.id 
-              WHERE s.user_id = " . $staff_id . " AND s.sale_date = '" . $today_date . "' 
-              ORDER BY s.id DESC";
-$sales_result = $conn->query($sales_sql);
-if ($sales_result) { while ($row = $sales_result->fetch_assoc()) { $todays_sales[] = $row; } }
+// Today's sales
+$todays_sales = [];
+$sr = $conn->query("SELECT s.id, p.name, s.quantity_sold, s.total_price, s.payment_method, s.status, s.void_reason FROM sales s JOIN products p ON s.product_id=p.id WHERE s.user_id=$staff_id AND s.sale_date='$today_date' ORDER BY s.id DESC");
+while ($r = $sr->fetch_assoc()) $todays_sales[] = $r;
+
+// Today's totals
+$today_stats = $conn->query("SELECT SUM(total_price) as rev, COUNT(*) as cnt FROM sales WHERE user_id=$staff_id AND sale_date='$today_date' AND status='recorded'")->fetch_assoc();
+$my_rev = (float)($today_stats['rev']??0);
+$my_cnt = (int)($today_stats['cnt']??0);
+
+$all_categories = array_keys($products_in_stock);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Staff Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="../assets/css/style.css">
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Terminal — P3 Shop Pro</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
-<body>
-    <div class="header">
-        <div class="header-logo">
-            <i class="ri-store-2-fill"></i>
-            <h1>P3 Shop <span>Pro</span></h1>
-        </div>
-        <div class="header-user">
-            <span><i class="ri-user-smile-line"></i> <?php echo htmlspecialchars($_SESSION['username']); ?> (Staff)</span>
-            <a href="../logout.php" class="logout-btn"><i class="ri-logout-box-r-line"></i> Logout</a>
+<body style="background:var(--bg);">
+
+<!-- Staff Top Bar -->
+<div class="topbar" style="position:sticky;top:0;z-index:100;">
+    <div class="topbar-left">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div style="width:36px;height:36px;background:var(--primary);border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-size:1.1rem;">
+                <i class="ri-store-2-fill"></i>
+            </div>
+            <div>
+                <div class="page-title">POS Terminal</div>
+                <div class="page-subtitle"><?= htmlspecialchars($username) ?> • <?= date('d M Y') ?></div>
+            </div>
         </div>
     </div>
-    <div class="container">
-        <?php echo $message; ?>
-        
-        <div class="card" style="max-width: 600px; margin: 0 auto;">
-            <div class="card-header">
-                <h2><i class="ri-shopping-cart-2-line"></i> Process New Sale</h2>
+    <div class="topbar-right">
+        <span class="topbar-time" id="live-clock"></span>
+        <a href="../logout.php" class="btn btn-danger btn-sm"><i class="ri-logout-box-r-line"></i> Logout</a>
+    </div>
+</div>
+
+<div style="padding:1rem 1.5rem;">
+    <?php if ($message === 'success'): ?>
+        <div class="alert alert-success"><i class="ri-checkbox-circle-line"></i> Sale recorded successfully!</div>
+    <?php elseif ($message === 'error'): ?>
+        <div class="alert alert-danger"><i class="ri-error-warning-line"></i> Sale failed. Check stock levels.</div>
+    <?php endif; ?>
+
+    <!-- Summary Bar -->
+    <div class="staff-summary-bar">
+        <div class="staff-summary-item"><div class="s-value">₦<?= number_format($my_rev,0) ?></div><div class="s-label">My Sales Today</div></div>
+        <div class="staff-summary-item"><div class="s-value"><?= $my_cnt ?></div><div class="s-label">Transactions</div></div>
+        <div class="staff-summary-item"><div class="s-value"><?= $my_cnt > 0 ? '₦'.number_format($my_rev/$my_cnt,0) : '—' ?></div><div class="s-label">Avg Order</div></div>
+    </div>
+
+    <!-- POS Layout -->
+    <div class="pos-layout">
+        <!-- Products Grid -->
+        <div class="pos-products">
+            <!-- Category Tabs -->
+            <div class="pos-cat-tabs">
+                <button class="pos-cat-btn active" onclick="filterCat('all', this)">All</button>
+                <?php foreach ($all_categories as $cat): ?>
+                <button class="pos-cat-btn" onclick="filterCat('<?= htmlspecialchars($cat) ?>', this)"><?= htmlspecialchars($cat) ?></button>
+                <?php endforeach; ?>
             </div>
-            
-            <form action="index.php" method="POST" id="sale-form">
-                <input type="hidden" id="product_id" name="product_id" required>
-                
-                <div class="form-group">
-                    <label>Product Category</label>
-                    <select id="category-select" style="font-size: 1.1rem; padding: 1rem;">
-                        <option value="all">-- All Categories --</option>
-                        <?php foreach (array_keys($products_in_stock) as $cat): ?>
-                            <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
 
-                <div class="form-group">
-                    <label>Select Product</label>
-                    <select id="product-select" style="font-size: 1.1rem; padding: 1rem;">
-                        <option value="">-- Choose Category First --</option>
-                        <?php foreach ($products_in_stock as $category => $items): ?>
-                            <?php foreach ($items as $product): ?>
-                                <option value="<?php echo $product['id']; ?>" 
-                                        data-category="<?php echo htmlspecialchars($category); ?>" 
-                                        data-price="<?php echo $product['price']; ?>"
-                                        data-name="<?php echo htmlspecialchars($product['name']); ?>"
-                                        data-stock="<?php echo $product['quantity_in_stock']; ?>">
-                                    <?php echo htmlspecialchars($product['name']); ?> (Stock: <?php echo $product['quantity_in_stock']; ?>) - ₦<?php echo number_format($product['price'], 0); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+            <!-- Search -->
+            <div class="search-box" style="max-width:none;">
+                <i class="ri-search-line"></i>
+                <input type="text" placeholder="Search products..." id="posSearch" oninput="searchProducts()">
+            </div>
 
-                <div class="grid-2">
-                    <div class="form-group">
-                        <label>Quantity</label>
-                        <input type="number" id="quantity_sold" name="quantity_sold" required min="1" value="1" style="font-size: 1.2rem; padding: 1rem;">
-                    </div>
-                    <div class="form-group">
-                        <label>Payment Method</label>
-                        <select name="payment_method" required style="font-size: 1.1rem; padding: 1rem;">
+            <!-- Product Buttons -->
+            <div class="pos-product-grid" id="productGrid">
+                <?php foreach ($products_in_stock as $cat => $items): foreach ($items as $p):
+                    $out = (int)$p['quantity_in_stock'] <= 0;
+                ?>
+                <button class="pos-product-btn <?= $out ? 'out-of-stock' : '' ?>"
+                        data-id="<?= $p['id'] ?>" data-name="<?= htmlspecialchars($p['name']) ?>"
+                        data-price="<?= $p['price'] ?>" data-stock="<?= $p['quantity_in_stock'] ?>"
+                        data-cat="<?= htmlspecialchars($cat) ?>"
+                        onclick="addToCart(this)" <?= $out ? 'disabled' : '' ?>>
+                    <div class="product-name"><?= htmlspecialchars($p['name']) ?></div>
+                    <div class="product-price">₦<?= number_format($p['price'],0) ?></div>
+                    <div class="product-stock"><?= $out ? 'Out of Stock' : $p['quantity_in_stock'].' left' ?></div>
+                </button>
+                <?php endforeach; endforeach; ?>
+            </div>
+        </div>
+
+        <!-- Cart Panel -->
+        <div class="card cart-panel">
+            <div class="cart-header">
+                <h3><i class="ri-shopping-cart-2-line"></i> Cart</h3>
+                <span class="cart-count" id="cartCount">0</span>
+            </div>
+
+            <div class="cart-items" id="cartItems">
+                <div class="cart-empty" id="cartEmpty">
+                    <i class="ri-shopping-cart-line"></i>
+                    <p>Tap a product to add it</p>
+                </div>
+            </div>
+
+            <div class="cart-totals" id="cartTotals" style="display:none;">
+                <div class="cart-total-row">
+                    <span>Subtotal</span><span id="subtotalVal">₦0</span>
+                </div>
+                <div class="cart-total-row grand">
+                    <span>Total</span><span id="grandTotal">₦0</span>
+                </div>
+            </div>
+
+            <div class="cart-checkout" id="cartCheckout" style="display:none;">
+                <form method="POST" id="saleForm">
+                    <input type="hidden" name="cart_data" id="cartDataInput">
+                    <div class="form-group" style="margin-bottom:0.75rem;">
+                        <label class="form-label">Payment Method</label>
+                        <select name="payment_method" class="form-control" required>
                             <option value="Cash">Cash</option>
                             <option value="Transfer">Transfer</option>
                             <option value="Card">Card</option>
                         </select>
                     </div>
-                </div>
-
-                <div class="live-total-display" style="text-align: center; margin-bottom: 1.5rem;">
-                    <p style="font-size: 0.9rem; color: var(--text-muted);">TOTAL PRICE</p>
-                    <span id="live-total">₦0.00</span>
-                </div>
-
-                <button type="submit" name="process_sale" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 1.3rem; padding: 1.2rem;">
-                    <i class="ri-check-double-line"></i> Complete Sale
-                </button>
-            </form>
-        </div>
-
-        <div class="card" style="margin-top: 2rem; max-width: 800px; margin-left: auto; margin-right: auto;">
-            <div class="card-header"><h3>Recent Sales Today</h3></div>
-            <div class="table-wrapper">
-                <table class="content-table">
-                    <thead><tr><th>Product</th><th>Qty</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
-                    <tbody>
-                        <?php if (empty($todays_sales)): ?>
-                            <tr><td colspan="5" style="text-align: center;">No sales yet</td></tr>
-                        <?php else: foreach (array_slice($todays_sales, 0, 10) as $sale): ?>
-                            <tr>
-                                <td data-label="Product"><?php echo htmlspecialchars($sale['name']); ?></td>
-                                <td data-label="Qty"><?php echo $sale['quantity_sold']; ?></td>
-                                <td data-label="Total">₦<?php echo number_format($sale['total_price'], 0); ?></td>
-                                <td data-label="Status">
-                                    <span class="badge <?php echo $sale['status'] == 'recorded' ? 'badge-success' : 'badge-warning'; ?>">
-                                        <?php echo ucfirst($sale['status']); ?>
-                                    </span>
-                                </td>
-                                <td data-label="Action">
-                                    <?php if ($sale['status'] == 'recorded'): ?>
-                                        <button onclick="reverseSale(<?php echo $sale['id']; ?>)" class="btn btn-warning" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">
-                                            <i class="ri-arrow-go-back-line"></i> Mistake / Return
-                                        </button>
-                                    <?php else: ?>
-                                        <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">
-                                            <?php echo htmlspecialchars($sale['void_reason']); ?>
-                                        </span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
+                    <button type="submit" name="process_sale" class="btn btn-success btn-block btn-lg">
+                        <i class="ri-check-double-line"></i> Complete Sale
+                    </button>
+                    <button type="button" onclick="clearCart()" class="btn btn-ghost btn-block btn-sm mt-1">Clear Cart</button>
+                </form>
             </div>
         </div>
     </div>
 
-    <!-- Hidden Reversal Form -->
-    <form id="reversal-form" action="void_sale.php" method="POST" style="display: none;">
-        <input type="hidden" name="sale_id" id="reversal-id">
-        <input type="hidden" name="reason" id="reversal-reason">
-        <input type="hidden" name="action" id="reversal-action">
-    </form>
+    <!-- Today's Sales -->
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3><i class="ri-history-line"></i> Today's Sales</h3>
+            <span class="badge badge-primary"><?= count($todays_sales) ?> transactions</span>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>Product</th><th>Qty</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                <?php if (empty($todays_sales)): ?>
+                    <tr><td colspan="5" style="text-align:center;padding:1.5rem;color:var(--text-muted);">No sales yet today</td></tr>
+                <?php else: foreach ($todays_sales as $sale): ?>
+                    <tr>
+                        <td data-label="Product"><strong><?= htmlspecialchars($sale['name']) ?></strong></td>
+                        <td data-label="Qty"><?= $sale['quantity_sold'] ?></td>
+                        <td data-label="Total" class="money fw-700">₦<?= number_format($sale['total_price'],0) ?></td>
+                        <td data-label="Status">
+                            <span class="badge badge-<?= $sale['status']==='recorded'?'success':'danger' ?>">
+                                <?= ucfirst($sale['status']) ?>
+                            </span>
+                        </td>
+                        <td data-label="Action">
+                            <?php if ($sale['status'] === 'recorded'): ?>
+                            <button onclick="reverseSale(<?= $sale['id'] ?>)" class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger);">
+                                <i class="ri-arrow-go-back-line"></i> Void
+                            </button>
+                            <?php else: ?>
+                            <span style="font-size:0.72rem;color:var(--text-muted);font-style:italic;"><?= htmlspecialchars($sale['void_reason']) ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
-    <script>
-        function reverseSale(id) {
-            const action = confirm("Was this a Mistake (Void) or a Return?\n\nOK for Mistake/Void, Cancel for Return.") ? 'voided' : 'returned';
-            const reason = prompt("Enter REASON for " + action.toUpperCase() + " (Mandatory):");
-            
-            if (reason && reason.trim().length > 3) {
-                document.getElementById('reversal-id').value = id;
-                document.getElementById('reversal-reason').value = reason;
-                document.getElementById('reversal-action').value = action;
-                document.getElementById('reversal-form').submit();
-            } else if (reason !== null) {
-                alert("Valid reason is required to process reversals.");
-            }
-        }
-        const categorySelect = document.getElementById('category-select');
-        const productSelect = document.getElementById('product-select');
-        const productIdInput = document.getElementById('product_id');
-        const quantityInput = document.getElementById('quantity_sold');
-        const totalDisplay = document.getElementById('live-total');
-        
-        const allProductOptions = Array.from(productSelect.options).slice(1); // Keep references to all options
+<!-- Void Form -->
+<form id="reversal-form" action="void_sale.php" method="POST" style="display:none;">
+    <input type="hidden" name="sale_id" id="reversal-id">
+    <input type="hidden" name="reason" id="reversal-reason">
+    <input type="hidden" name="action" id="reversal-action">
+</form>
 
-        function updateProductList() {
-            const selectedCat = categorySelect.value;
-            productSelect.innerHTML = '<option value="">-- Select Product --</option>';
-            
-            allProductOptions.forEach(opt => {
-                if (selectedCat === 'all' || opt.dataset.category === selectedCat) {
-                    productSelect.appendChild(opt.cloneNode(true));
-                }
-            });
-            
-            calculateTotal();
-        }
+<script>
+// Clock
+function updateClock() {
+    document.getElementById('live-clock').textContent = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+setInterval(updateClock,1000); updateClock();
 
-        function calculateTotal() {
-            const selectedOpt = productSelect.options[productSelect.selectedIndex];
-            if (selectedOpt && selectedOpt.value) {
-                productIdInput.value = selectedOpt.value;
-                const price = parseFloat(selectedOpt.dataset.price);
-                const qty = parseInt(quantityInput.value) || 0;
-                const total = price * qty;
-                totalDisplay.textContent = '₦' + total.toLocaleString('en-US', { minimumFractionDigits: 2 });
-            } else {
-                productIdInput.value = '';
-                totalDisplay.textContent = '₦0.00';
-            }
-        }
+// Cart State
+let cart = [];
 
-        categorySelect.addEventListener('change', updateProductList);
-        productSelect.addEventListener('change', calculateTotal);
-        quantityInput.addEventListener('input', calculateTotal);
-        
-        // Initial load
-        updateProductList();
-    </script>
+function addToCart(btn) {
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    const price = parseFloat(btn.dataset.price);
+    const stock = parseInt(btn.dataset.stock);
+
+    const existing = cart.find(i => i.id == id);
+    if (existing) {
+        if (existing.qty < stock) existing.qty++;
+        else { alert('Not enough stock!'); return; }
+    } else {
+        cart.push({ id, name, price, stock, qty: 1 });
+    }
+    renderCart();
+}
+
+function renderCart() {
+    const container = document.getElementById('cartItems');
+    const empty = document.getElementById('cartEmpty');
+    const totals = document.getElementById('cartTotals');
+    const checkout = document.getElementById('cartCheckout');
+    const countEl = document.getElementById('cartCount');
+
+    if (cart.length === 0) {
+        container.innerHTML = '<div class="cart-empty" id="cartEmpty"><i class="ri-shopping-cart-line"></i><p>Tap a product to add it</p></div>';
+        totals.style.display = 'none';
+        checkout.style.display = 'none';
+        countEl.textContent = '0';
+        return;
+    }
+
+    countEl.textContent = cart.reduce((s,i) => s+i.qty, 0);
+    let html = '';
+    let total = 0;
+
+    cart.forEach((item, idx) => {
+        const itemTotal = item.price * item.qty;
+        total += itemTotal;
+        html += `
+        <div class="cart-item">
+            <div class="cart-item-info">
+                <div class="cart-item-name">${item.name}</div>
+                <div class="cart-item-price">₦${item.price.toLocaleString()} × ${item.qty} = ₦${itemTotal.toLocaleString()}</div>
+            </div>
+            <div class="qty-control">
+                <button class="qty-btn" onclick="changeQty(${idx},-1)">−</button>
+                <span class="qty-num">${item.qty}</span>
+                <button class="qty-btn" onclick="changeQty(${idx},1)">+</button>
+            </div>
+            <button class="cart-remove" onclick="removeItem(${idx})"><i class="ri-close-line"></i></button>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+    document.getElementById('subtotalVal').textContent = '₦' + total.toLocaleString();
+    document.getElementById('grandTotal').textContent = '₦' + total.toLocaleString();
+    totals.style.display = 'block';
+    checkout.style.display = 'block';
+}
+
+function changeQty(idx, delta) {
+    cart[idx].qty += delta;
+    if (cart[idx].qty <= 0) cart.splice(idx, 1);
+    else if (cart[idx].qty > cart[idx].stock) { cart[idx].qty = cart[idx].stock; alert('Max stock reached!'); }
+    renderCart();
+}
+
+function removeItem(idx) { cart.splice(idx, 1); renderCart(); }
+function clearCart() { cart = []; renderCart(); }
+
+// Submit sale
+document.getElementById('saleForm').addEventListener('submit', function(e) {
+    if (cart.length === 0) { e.preventDefault(); alert('Cart is empty!'); return; }
+    document.getElementById('cartDataInput').value = JSON.stringify(cart.map(i => ({id:i.id, qty:i.qty})));
+});
+
+// Category filter
+function filterCat(cat, btn) {
+    document.querySelectorAll('.pos-cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.pos-product-btn').forEach(b => {
+        b.style.display = (cat === 'all' || b.dataset.cat === cat) ? '' : 'none';
+    });
+}
+
+// Search products
+function searchProducts() {
+    const q = document.getElementById('posSearch').value.toLowerCase();
+    document.querySelectorAll('.pos-product-btn').forEach(b => {
+        b.style.display = b.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+// Void sale
+function reverseSale(id) {
+    const action = confirm("Mistake (Void) or Return?\n\nOK = Void, Cancel = Return") ? 'voided' : 'returned';
+    const reason = prompt("Enter REASON for " + action.toUpperCase() + " (required):");
+    if (reason && reason.trim().length > 3) {
+        document.getElementById('reversal-id').value = id;
+        document.getElementById('reversal-reason').value = reason;
+        document.getElementById('reversal-action').value = action;
+        document.getElementById('reversal-form').submit();
+    } else if (reason !== null) {
+        alert("A valid reason is required.");
+    }
+}
+</script>
 </body>
 </html>
