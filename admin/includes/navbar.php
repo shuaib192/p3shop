@@ -1,18 +1,10 @@
 <?php
 $currentPage = basename($_SERVER['PHP_SELF']);
 
-// Build absolute base path: works on both XAMPP (/p3shop) and Hostinger (site root)
-$scriptDir  = str_replace('\\', '/', $_SERVER['SCRIPT_NAME']); // e.g. /p3shop/update_stock.php
-$shopRoot   = rtrim(str_replace('/admin/includes/navbar.php', '',
-               str_replace('\\', '/', __FILE__)), '/'); // absolute FS path to shop root
-// URL root: strip everything after the first segment that matches p3shop or public_html/shop
-// Simplest reliable method: walk up from SCRIPT_NAME to find the shop root URL segment
-$parts      = explode('/', trim($scriptDir, '/'));
-// On Hostinger script is /update_stock.php or /admin/products.php  (shop is domain root)
-// On XAMPP  script is /p3shop/update_stock.php or /p3shop/admin/products.php
-// We detect by checking if first segment is 'p3shop'
-$baseUrl    = (isset($parts[0]) && $parts[0] === 'p3shop') ? '/p3shop' : '';
-$adminBase  = $baseUrl . '/admin';
+// Detect environment via filesystem path (__FILE__ is always absolute and reliable)
+// XAMPP:     .../htdocs/p3shop/admin/includes/navbar.php
+// Hostinger: .../public_html/shop/admin/includes/navbar.php
+$adminBase = (strpos(__FILE__, 'htdocs') !== false) ? '/p3shop/admin' : '/admin';
 
 // Count low stock for badge
 $low_stock_count = 0;
