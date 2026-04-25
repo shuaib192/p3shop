@@ -4,7 +4,8 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 // Detect environment via filesystem path (__FILE__ is always absolute and reliable)
 // XAMPP:     .../htdocs/p3shop/admin/includes/navbar.php
 // Hostinger: .../public_html/shop/admin/includes/navbar.php
-$adminBase = (strpos(__FILE__, 'htdocs') !== false) ? '/p3shop/admin' : '/admin';
+$shopBase  = (strpos(__FILE__, 'htdocs') !== false) ? '/p3shop' : '';
+$adminBase = $shopBase . '/admin';
 
 // Count low stock for badge
 $low_stock_count = 0;
@@ -79,7 +80,7 @@ $initial = strtoupper(substr($username, 0, 1));
     </nav>
 
     <div class="sidebar-footer">
-        <a href="../logout.php" class="sidebar-user" style="text-decoration:none">
+        <a href="<?= $shopBase ?>/logout.php" class="sidebar-user" style="text-decoration:none">
             <div class="sidebar-avatar"><?= $initial ?></div>
             <div class="sidebar-user-info">
                 <strong><?= htmlspecialchars($username) ?></strong>
