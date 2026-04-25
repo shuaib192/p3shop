@@ -138,7 +138,7 @@ $cat_filter = $_GET['cat'] ?? '';
                         <td data-label="Actions">
                             <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
                                 <a href="edit_product.php?id=<?= $p['id'] ?>" class="btn btn-outline btn-sm"><i class="ri-pencil-line"></i></a>
-                                <a href="../update_stock.php?id=<?= $p['id'] ?>" class="btn btn-info btn-sm"><i class="ri-add-circle-line"></i></a>
+                                <a href="update_stock.php?id=<?= $p['id'] ?>" class="btn btn-info btn-sm"><i class="ri-add-circle-line"></i></a>
                                 <a href="delete_product.php?id=<?= $p['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete this product permanently?')"><i class="ri-delete-bin-line"></i></a>
                             </div>
                         </td>

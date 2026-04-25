@@ -1,15 +1,15 @@
 <?php
-require_once 'includes/db.php';
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') { header('Location: login.php'); exit; }
+require_once '../includes/db.php';
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') { header('Location: ../login.php'); exit; }
 
 $message = '';
 $admin_id = (int)$_SESSION['user_id'];
 $product_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-if ($product_id <= 0) { header('Location: admin/products.php'); exit; }
+if ($product_id <= 0) { header('Location: products.php'); exit; }
 
 $product = $conn->query("SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id=c.id WHERE p.id=$product_id")->fetch_assoc();
-if (!$product) { header('Location: admin/products.php'); exit; }
+if (!$product) { header('Location: products.php'); exit; }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_stock'])) {
     $change = (int)$_POST['quantity_change'];
@@ -43,11 +43,11 @@ while ($r = $hr->fetch_assoc()) $history[] = $r;
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Update Stock — P3 Shop Pro</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
 <div class="app-layout">
-<?php include 'admin/includes/navbar.php'; ?>
+<?php include 'includes/navbar.php'; ?>
 <div class="main-content">
     <div class="topbar">
         <div class="topbar-left">
@@ -58,7 +58,7 @@ while ($r = $hr->fetch_assoc()) $history[] = $r;
             </div>
         </div>
         <div class="topbar-right">
-            <a href="admin/products.php" class="btn btn-outline btn-sm"><i class="ri-arrow-left-line"></i> Back</a>
+            <a href="products.php" class="btn btn-outline btn-sm"><i class="ri-arrow-left-line"></i> Back</a>
         </div>
     </div>
 
