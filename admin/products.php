@@ -19,14 +19,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_product'])) {
         if ($conn->query($sql)) {
             $pid = $conn->insert_id;
             $conn->query("INSERT INTO stock_log (product_id, user_id, quantity_change, reason) VALUES ($pid, $admin_id, $quantity, 'Initial stock for new product')");
-            $message = '<div class="alert alert-success"><i class="ri-checkbox-circle-line"></i> Product added successfully!</div>';
+            $_SESSION['msg'] = '<div class="alert alert-success"><i class="ri-checkbox-circle-line"></i> Product added successfully!</div>';
         } else {
-            $message = '<div class="alert alert-danger"><i class="ri-error-warning-line"></i> Error adding product.</div>';
+            $_SESSION['msg'] = '<div class="alert alert-danger"><i class="ri-error-warning-line"></i> Error adding product.</div>';
         }
     } else {
-        $message = '<div class="alert alert-danger"><i class="ri-error-warning-line"></i> Please fill all required fields.</div>';
+        $_SESSION['msg'] = '<div class="alert alert-danger"><i class="ri-error-warning-line"></i> Please fill all required fields.</div>';
     }
+    header('Location: products.php');
+    exit;
 }
+
+$message = $_SESSION['msg'] ?? '';
+unset($_SESSION['msg']);
 
 $products = [];
 $res = $conn->query("SELECT p.*, c.name as category_name,

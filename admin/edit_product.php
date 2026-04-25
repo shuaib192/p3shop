@@ -19,7 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt = $conn->prepare("UPDATE products SET name = ?, description = ?, quantity_in_stock = ?, price = ?, category_id = ?, cost_price = ?, units_per_pack = ? WHERE id = ?");
         $stmt->bind_param("ssididii", $name, $description, $quantity, $price, $category_id, $cost_price, $units_per_pack, $product_id);
         if ($stmt->execute()) {
-            $message = '<div class="alert alert-success"><i class="ri-checkbox-circle-line"></i> Product updated! <a href="products.php" style="color:inherit;text-decoration:underline;">Back to products</a></div>';
+            $_SESSION['msg'] = '<div class="alert alert-success"><i class="ri-checkbox-circle-line"></i> Product updated! <a href="products.php" style="color:inherit;text-decoration:underline;">Back to products</a></div>';
+            header("Location: edit_product.php?id=$product_id");
+            exit;
         } else {
             $message = '<div class="alert alert-danger"><i class="ri-error-warning-line"></i> Error updating product.</div>';
         }
@@ -27,6 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } else {
         $message = '<div class="alert alert-danger"><i class="ri-error-warning-line"></i> Please fill all fields correctly.</div>';
     }
+}
+
+if (isset($_SESSION['msg'])) {
+    $message = $_SESSION['msg'];
+    unset($_SESSION['msg']);
 }
 
 $stmt = $conn->prepare("SELECT * FROM products WHERE id = ?");

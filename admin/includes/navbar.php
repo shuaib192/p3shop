@@ -1,5 +1,6 @@
 <?php
 $currentPage = basename($_SERVER['PHP_SELF']);
+$isInAdmin = strpos($_SERVER['PHP_SELF'], '/admin/') !== false;
 
 // Count low stock for badge
 $low_stock_count = 0;
@@ -25,50 +26,50 @@ $initial = strtoupper(substr($username, 0, 1));
     <nav class="sidebar-nav">
         <span class="sidebar-section-label">Overview</span>
 
-        <a href="index.php" class="sidebar-link <?= $currentPage == 'index.php' ? 'active' : '' ?>">
+        <a href="<?= $isInAdmin ? '' : 'admin/' ?>index.php" class="sidebar-link <?= $currentPage == 'index.php' ? 'active' : '' ?>">
             <i class="ri-dashboard-3-line"></i> Dashboard
         </a>
 
         <span class="sidebar-section-label">Inventory</span>
 
-        <a href="products.php" class="sidebar-link <?= $currentPage == 'products.php' || $currentPage == 'edit_product.php' ? 'active' : '' ?>">
+        <a href="<?= $isInAdmin ? '' : 'admin/' ?>products.php" class="sidebar-link <?= $currentPage == 'products.php' || $currentPage == 'edit_product.php' ? 'active' : '' ?>">
             <i class="ri-archive-2-line"></i> Products
             <?php if ($low_stock_count > 0): ?>
                 <span class="badge-count"><?= $low_stock_count ?></span>
             <?php endif; ?>
         </a>
 
-        <a href="manage_categories.php" class="sidebar-link <?= $currentPage == 'manage_categories.php' ? 'active' : '' ?>">
+        <a href="<?= $isInAdmin ? '' : 'admin/' ?>manage_categories.php" class="sidebar-link <?= $currentPage == 'manage_categories.php' ? 'active' : '' ?>">
             <i class="ri-price-tag-3-line"></i> Categories
         </a>
 
         <span class="sidebar-section-label">Analytics</span>
 
-        <a href="summaries.php" class="sidebar-link <?= $currentPage == 'summaries.php' ? 'active' : '' ?>">
+        <a href="<?= $isInAdmin ? '' : 'admin/' ?>summaries.php" class="sidebar-link <?= $currentPage == 'summaries.php' ? 'active' : '' ?>">
             <i class="ri-line-chart-line"></i> Business Insights
         </a>
 
-        <a href="daily_summary.php" class="sidebar-link <?= $currentPage == 'daily_summary.php' ? 'active' : '' ?>">
+        <a href="<?= $isInAdmin ? '' : 'admin/' ?>daily_summary.php" class="sidebar-link <?= $currentPage == 'daily_summary.php' ? 'active' : '' ?>">
             <i class="ri-calendar-check-line"></i> Daily Report
         </a>
 
-        <a href="profit_loss.php" class="sidebar-link <?= $currentPage == 'profit_loss.php' ? 'active' : '' ?>">
+        <a href="<?= $isInAdmin ? '' : 'admin/' ?>profit_loss.php" class="sidebar-link <?= $currentPage == 'profit_loss.php' ? 'active' : '' ?>">
             <i class="ri-funds-line"></i> Profit & Loss
         </a>
 
         <span class="sidebar-section-label">Operations</span>
 
-        <a href="activity_log.php" class="sidebar-link <?= $currentPage == 'activity_log.php' ? 'active' : '' ?>">
+        <a href="<?= $isInAdmin ? '' : 'admin/' ?>activity_log.php" class="sidebar-link <?= $currentPage == 'activity_log.php' ? 'active' : '' ?>">
             <i class="ri-shield-check-line"></i> Audit Log
         </a>
 
-        <a href="manage_staff.php" class="sidebar-link <?= $currentPage == 'manage_staff.php' ? 'active' : '' ?>">
+        <a href="<?= $isInAdmin ? '' : 'admin/' ?>manage_staff.php" class="sidebar-link <?= $currentPage == 'manage_staff.php' ? 'active' : '' ?>">
             <i class="ri-group-line"></i> Staff
         </a>
 
         <span class="sidebar-section-label">Exports</span>
 
-        <a href="summaries.php" class="sidebar-link">
+        <a href="<?= $isInAdmin ? '' : 'admin/' ?>summaries.php" class="sidebar-link">
             <i class="ri-file-chart-line"></i> Reports & Exports
         </a>
     </nav>
