@@ -22,12 +22,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_stock'])) {
         $conn->query("UPDATE products SET quantity_in_stock = $new_qty WHERE id = $product_id");
         $conn->query("INSERT INTO stock_log (product_id, user_id, quantity_change, reason) VALUES ($product_id, $admin_id, $change, '$reason')");
 
-        $message = '<div class="alert alert-success"><i class="ri-checkbox-circle-line"></i> Stock updated! New level: <strong>' . $new_qty . ' units</strong></div>';
-        $product['quantity_in_stock'] = $new_qty;
+        $_SESSION['msg'] = '<div class="alert alert-success"><i class="ri-checkbox-circle-line"></i> Stock updated! New level: <strong>' . $new_qty . ' units</strong></div>';
     } else {
-        $message = '<div class="alert alert-danger"><i class="ri-error-warning-line"></i> Enter a quantity and reason.</div>';
+        $_SESSION['msg'] = '<div class="alert alert-danger"><i class="ri-error-warning-line"></i> Enter a quantity and reason.</div>';
     }
+    header("Location: update_stock.php?id=$product_id");
+    exit;
 }
+
+$message = $_SESSION['msg'] ?? '';
+unset($_SESSION['msg']);
 
 // Stock history
 $history = [];
