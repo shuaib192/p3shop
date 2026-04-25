@@ -149,62 +149,69 @@ $cat_filter = $_GET['cat'] ?? '';
 
 <!-- Add Product Modal -->
 <div class="modal-overlay" id="addModal">
-    <div class="modal" style="max-width:600px;">
-        <div class="modal-header">
-            <h3><i class="ri-add-circle-line" style="color:var(--primary)"></i> Add New Product</h3>
+    <div class="modal" style="max-width:540px;">
+        <div class="modal-header" style="padding:1rem 1.25rem;">
+            <h3 style="font-size:0.95rem;"><i class="ri-add-circle-line" style="color:var(--primary)"></i> Add New Product</h3>
             <button class="modal-close" onclick="document.getElementById('addModal').classList.remove('open')"><i class="ri-close-line"></i></button>
         </div>
         <form method="POST" action="products.php">
-            <div class="modal-body">
-                <div class="form-group">
-                    <label class="form-label">Product Name *</label>
-                    <input type="text" name="name" class="form-control" required placeholder="e.g. Coca-Cola 50cl">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Category</label>
-                        <select name="category_id" class="form-control">
+            <div class="modal-body" style="padding:1rem;">
+                <!-- Row 1: Name + Category -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-size:0.75rem;">Product Name *</label>
+                        <input type="text" name="name" class="form-control" style="padding:0.5rem 0.75rem;" required placeholder="e.g. Coca-Cola 50cl">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-size:0.75rem;">Category</label>
+                        <select name="category_id" class="form-control" style="padding:0.5rem 0.75rem;">
                             <option value="0">Uncategorized</option>
                             <?php foreach ($categories as $cat): ?>
                             <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Initial Qty *</label>
-                        <input type="number" name="quantity" class="form-control" required min="0" placeholder="0">
+                </div>
+                <!-- Row 2: Pack Cost + Units/Pack + Sell Price -->
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-size:0.75rem;">Pack Cost (₦) *</label>
+                        <input type="number" name="cost_price" class="form-control" style="padding:0.5rem 0.75rem;" required min="0" step="0.01" placeholder="0.00" id="packCostInput">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-size:0.75rem;">Units/Pack *</label>
+                        <input type="number" name="units_per_pack" class="form-control" style="padding:0.5rem 0.75rem;" required min="1" value="1" id="unitsPackInput">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-size:0.75rem;">Sell Price/Unit (₦) *</label>
+                        <input type="number" name="price" class="form-control" style="padding:0.5rem 0.75rem;" required min="0" step="0.01" placeholder="0.00" id="sellPriceInput">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Description</label>
-                    <textarea name="description" class="form-control" rows="2" placeholder="Brief description (optional)"></textarea>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Pack Cost (₦) *</label>
-                        <input type="number" name="cost_price" class="form-control" required min="0" step="0.01" placeholder="0.00" id="packCostInput">
+                <!-- Row 3: Qty + Description -->
+                <div style="display:grid;grid-template-columns:120px 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-size:0.75rem;">Initial Qty *</label>
+                        <input type="number" name="quantity" class="form-control" style="padding:0.5rem 0.75rem;" required min="0" placeholder="0">
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Units/Pack *</label>
-                        <input type="number" name="units_per_pack" class="form-control" required min="1" value="1" id="unitsPackInput">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Sell Price/Unit (₦) *</label>
-                        <input type="number" name="price" class="form-control" required min="0" step="0.01" placeholder="0.00" id="sellPriceInput">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label" style="font-size:0.75rem;">Description</label>
+                        <input type="text" name="description" class="form-control" style="padding:0.5rem 0.75rem;" placeholder="Optional">
                     </div>
                 </div>
-                <div style="background:var(--surface-2);padding:0.75rem 1rem;border-radius:var(--radius-sm);display:flex;justify-content:space-between;font-size:0.85rem;">
-                    <span>Estimated Margin:</span>
+                <!-- Margin Preview -->
+                <div style="background:var(--surface-2);padding:0.5rem 0.75rem;border-radius:var(--radius-sm);display:flex;justify-content:space-between;font-size:0.8rem;">
+                    <span style="color:var(--text-muted);">Estimated Margin:</span>
                     <strong id="marginCalc" style="color:var(--success)">—</strong>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-ghost" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
-                <button type="submit" name="add_product" class="btn btn-primary"><i class="ri-check-line"></i> Add Product</button>
+            <div class="modal-footer" style="padding:0.75rem 1rem;">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+                <button type="submit" name="add_product" class="btn btn-primary btn-sm"><i class="ri-check-line"></i> Add Product</button>
             </div>
         </form>
     </div>
 </div>
+
 
 <script>
 function filterProducts() {
