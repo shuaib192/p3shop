@@ -1,11 +1,11 @@
 <?php
 $currentPage = basename($_SERVER['PHP_SELF']);
 
-// Detect environment via filesystem path (__FILE__ is always absolute and reliable)
-// XAMPP:     .../htdocs/p3shop/admin/includes/navbar.php
-// Hostinger: .../public_html/shop/admin/includes/navbar.php
-$shopBase  = (strpos(__FILE__, 'htdocs') !== false) ? '/p3shop' : '';
-$adminBase = $shopBase . '/admin';
+// Calculate relative path to admin folder
+// This works whether the navbar is included from root or from within the admin folder.
+$isInAdmin = (strpos($_SERVER['PHP_SELF'], '/admin/') !== false);
+$toAdmin = $isInAdmin ? '' : 'admin/';
+$toRoot = $isInAdmin ? '../' : '';
 
 // Count low stock for badge
 $low_stock_count = 0;
@@ -31,56 +31,56 @@ $initial = strtoupper(substr($username, 0, 1));
     <nav class="sidebar-nav">
         <span class="sidebar-section-label">Overview</span>
 
-        <a href="<?= $adminBase ?>/index.php" class="sidebar-link <?= $currentPage == 'index.php' ? 'active' : '' ?>">
+        <a href="<?= $toAdmin ?>index.php" class="sidebar-link <?= $currentPage == 'index.php' ? 'active' : '' ?>">
             <i class="ri-dashboard-3-line"></i> Dashboard
         </a>
 
         <span class="sidebar-section-label">Inventory</span>
 
-        <a href="<?= $adminBase ?>/products.php" class="sidebar-link <?= $currentPage == 'products.php' || $currentPage == 'edit_product.php' ? 'active' : '' ?>">
+        <a href="<?= $toAdmin ?>products.php" class="sidebar-link <?= $currentPage == 'products.php' || $currentPage == 'edit_product.php' ? 'active' : '' ?>">
             <i class="ri-archive-2-line"></i> Products
             <?php if ($low_stock_count > 0): ?>
                 <span class="badge-count"><?= $low_stock_count ?></span>
             <?php endif; ?>
         </a>
 
-        <a href="<?= $adminBase ?>/manage_categories.php" class="sidebar-link <?= $currentPage == 'manage_categories.php' ? 'active' : '' ?>">
+        <a href="<?= $toAdmin ?>manage_categories.php" class="sidebar-link <?= $currentPage == 'manage_categories.php' ? 'active' : '' ?>">
             <i class="ri-price-tag-3-line"></i> Categories
         </a>
 
         <span class="sidebar-section-label">Analytics</span>
 
-        <a href="<?= $adminBase ?>/summaries.php" class="sidebar-link <?= $currentPage == 'summaries.php' ? 'active' : '' ?>">
+        <a href="<?= $toAdmin ?>summaries.php" class="sidebar-link <?= $currentPage == 'summaries.php' ? 'active' : '' ?>">
             <i class="ri-line-chart-line"></i> Business Insights
         </a>
 
-        <a href="<?= $adminBase ?>/daily_summary.php" class="sidebar-link <?= $currentPage == 'daily_summary.php' ? 'active' : '' ?>">
+        <a href="<?= $toAdmin ?>daily_summary.php" class="sidebar-link <?= $currentPage == 'daily_summary.php' ? 'active' : '' ?>">
             <i class="ri-calendar-check-line"></i> Daily Report
         </a>
 
-        <a href="<?= $adminBase ?>/profit_loss.php" class="sidebar-link <?= $currentPage == 'profit_loss.php' ? 'active' : '' ?>">
+        <a href="<?= $toAdmin ?>profit_loss.php" class="sidebar-link <?= $currentPage == 'profit_loss.php' ? 'active' : '' ?>">
             <i class="ri-funds-line"></i> Profit & Loss
         </a>
 
         <span class="sidebar-section-label">Operations</span>
 
-        <a href="<?= $adminBase ?>/activity_log.php" class="sidebar-link <?= $currentPage == 'activity_log.php' ? 'active' : '' ?>">
+        <a href="<?= $toAdmin ?>activity_log.php" class="sidebar-link <?= $currentPage == 'activity_log.php' ? 'active' : '' ?>">
             <i class="ri-shield-check-line"></i> Audit Log
         </a>
 
-        <a href="<?= $adminBase ?>/manage_staff.php" class="sidebar-link <?= $currentPage == 'manage_staff.php' ? 'active' : '' ?>">
+        <a href="<?= $toAdmin ?>manage_staff.php" class="sidebar-link <?= $currentPage == 'manage_staff.php' ? 'active' : '' ?>">
             <i class="ri-group-line"></i> Staff
         </a>
 
         <span class="sidebar-section-label">Exports</span>
 
-        <a href="<?= $adminBase ?>/summaries.php" class="sidebar-link">
+        <a href="<?= $toAdmin ?>summaries.php" class="sidebar-link">
             <i class="ri-file-chart-line"></i> Reports & Exports
         </a>
     </nav>
 
     <div class="sidebar-footer">
-        <a href="<?= $shopBase ?>/logout.php" class="sidebar-user" style="text-decoration:none">
+        <a href="<?= $toRoot ?>logout.php" class="sidebar-user" style="text-decoration:none">
             <div class="sidebar-avatar"><?= $initial ?></div>
             <div class="sidebar-user-info">
                 <strong><?= htmlspecialchars($username) ?></strong>
