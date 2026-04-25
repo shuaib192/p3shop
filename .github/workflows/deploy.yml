@@ -24,6 +24,7 @@ jobs:
           script: |
             cd ~/public_html/shop
             cp includes/db.php /tmp/db_production_backup.php
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             cp /tmp/db_production_backup.php includes/db.php
             echo "✅ Deployment complete!"
